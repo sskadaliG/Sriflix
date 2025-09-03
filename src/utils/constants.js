@@ -8,13 +8,11 @@ export const SRIFLIX_BG_LOGO = "https://www.rmets.org/sites/default/files/2024-0
 
 export const SRIFLIX_LOGO = "https://cdn-icons-png.flaticon.com/512/1179/1179120.png";
 
-export const API_OPTIONS = {
-    method: "GET",
-    headers: {
-        Authorization: "Bearer eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJhODMxNjRjYmE5ZmMwMWI0MDE1ZTEzODAwNGQzZDJhOSIsIm5iZiI6MTc1NjMzMTcwNS42OTgsInN1YiI6IjY4YWY3ZWI5YzU0MmNiMzkxNmYzOTVjMSIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.s8d2JGDyhVaJ60sf1U_iuFPBRlPsT-fJXL0nEnzgAtE",
-        accept: "application/json"
-    }
-
-};
-
 export const IMG_CDN_URL = "https://image.tmdb.org/t/p/w500";
+
+export const SUPPORTED_LANGUAGES = [{ identifier: "en", name: "English" },
+{ identifier: "hi", name: "Hindi" },
+{ identifier: "es", name: "Spanish" },
+{ identifier: "zh", name: "Chinese" },
+{ identifier: "ko", name: "Korean" }
+];
