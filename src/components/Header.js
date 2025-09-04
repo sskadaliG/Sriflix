@@ -9,7 +9,7 @@ import { addUser, removeUser } from "../utils/userSlice"
 import { LOGO, SRIFLIX_LOGO, SUPPORTED_LANGUAGES, user_AVATAR } from "../utils/constants";
 import { toggleGptSearchView } from "../utils/gptSlice";
 import { selectLanguage } from "../utils/configSlice";
-import lang from "../utils/language constants";
+import lang from "../utils/languageConstants";
 
 
 const Header = () => {
@@ -62,7 +62,7 @@ const Header = () => {
       <img className="w-1/6" data-test-id="netflix-logo" src={LOGO} alt="logo" />
       {user && <p className="text-white text-lg font-bold py-8 ">Welcome {user.displayName}!</p>}
       {user && <div className="flex m-4 ">
-        {gptSearch && <select className="flex mt-5 mr-3.5 p-2 h-10 rounded hover:cursor-pointer" onChange={handleLangChange}>
+        {gptSearch && <select className="flex mt-5 mr-3.5 p-2 h-10 rounded hover:cursor-pointer hover:opacity-65" onChange={handleLangChange}>
           {SUPPORTED_LANGUAGES.map((lang) => <option key={lang.identifier} value={lang.identifier}>{lang.name}</option>)}
         </select>}
         <button className="bg-blue-700 mt-5 mr-3.5 p-2 h-10 rounded font-bold text-white hover:bg-blue-300 bg-opacity-80" onClick={handleGptSearchClick}>{gptSearch ? (lang[language].homePage) : "✨ Search"}</button>
