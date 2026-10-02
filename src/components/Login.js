@@ -5,7 +5,8 @@ import { createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfi
 import { auth } from '../utils/firebase';
 import { addUser } from '../utils/userSlice';
 import { useDispatch } from 'react-redux';
-import { BACKGROUND_LOGO, user_AVATAR } from '../utils/constants';
+import { BACKDROP_CLASSES } from '../utils/constants';
+import Footer from './Footer';
 
 const Login = () => {
     const [isSignInForm, setIsSignInForm] = useState(true);
@@ -28,24 +29,16 @@ const Login = () => {
                     // Signed up 
                     const user = userCredential.user;
                     updateProfile(user, {
-                        displayName: name.current.value,
-                        photoURL: user_AVATAR
+                        displayName: name.current.value
                     }).then(() => {
-                        const { uid, email, displayName, photoURL } = auth.currentUser;
-                        dispatch(addUser({ uid: uid, email: email, displayName: displayName, photoURL: photoURL }))
-                        // Profile updated!
-                        // ...
+                        const { uid, email, displayName } = auth.currentUser;
+                        dispatch(addUser({ uid: uid, email: email, displayName: displayName }))
                     }).catch((error) => {
-                        // An error occurred
-                        // ...
+                        setErrorMessage(error.message);
                     });
-                    // ...
                 })
                 .catch((error) => {
-                    const errorCode = error.code;
-                    const errorMessage = error.message;
-                    // ..
-                    setErrorMessage(errorCode + " - " + errorMessage);
+                    setErrorMessage(error.message);
                 });
         } else {
             // On success, the onAuthStateChanged listener in Header redirects to /browse.
@@ -67,10 +60,9 @@ const Login = () => {
     return (
         <div>
             <Header />
-            <div>
-                <img className="absolute bg-opacity-90" src={BACKGROUND_LOGO} alt="background-logo" />
-            </div >
-            <form onSubmit={(e) => e.preventDefault()} className="absolute bg-black w-3/12 p-16 my-36 mx-auto right-0 left-0 text-white opacity-85 rounded">
+            <div className={BACKDROP_CLASSES} />
+            <div className="min-h-screen flex flex-col">
+            <form onSubmit={(e) => e.preventDefault()} className="bg-black w-full max-w-md p-12 mt-36 mb-12 mx-auto text-white opacity-85 rounded">
 
                 <h1 className="font-bold text-3xl py-4">{isSignInForm ? "Sign In" : "Sign Up"}</h1>
 
@@ -84,23 +76,15 @@ const Login = () => {
 
                 <button className="p-2 my-4 bg-red-700 w-full rounded font-bold cursor-pointer hover:bg-red-800" onClick={onClickHandle}>{isSignInForm ? "Sign In" : "Sign Up"}</button>
 
-                {isSignInForm && <p className=" text-center">OR</p>}
-
-                {isSignInForm && <button className="p-2 my-4 bg-gray-800 w-full rounded font-bold cursor-pointer hover:bg-gray-900">Use a Sign-In Code</button>}
-
-                {isSignInForm && <p className=" text-center cursor-pointer hover:text-gray-300 underline">Forgot password?</p>}
-
                 <div className="flex my-4">
-                    <p>{isSignInForm ? "New to Sriflix?" : "Already a customer?"}</p>
+                    <p>{isSignInForm ? "New to Sriflix?" : "Already have an account?"}</p>
 
                     <p className=" text-center cursor-pointer hover:underline px-2 font-bold" onClick={toggleSignInForm}>{isSignInForm ? "Sign up now." : "Sign in here"}</p>
                 </div>
 
-                <p className="text-sm text-gray-500">This page is protected by Google reCAPTCHA to ensure you're not a bot.</p>
-
-                <p className="text-sm text-blue-500 py-2 underline cursor-pointer">Learn more</p>
-
             </form>
+            <div className="mt-auto"><Footer /></div>
+            </div>
 
         </div>
     )
