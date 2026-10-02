@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
-import { API_OPTIONS } from '../utils/keys';
 import { useDispatch, useSelector } from 'react-redux';
 import { addMovieTrailer } from '../utils/movieSlice';
+import { fetchTmdb } from '../utils/tmdb';
 
 const VideoBackground = ({ movieId }) => {
 
@@ -9,19 +9,17 @@ const VideoBackground = ({ movieId }) => {
 
   const dispatch = useDispatch();
 
-  const getMovieTrailer = async () => {
-    const data = await fetch(`https://api.themoviedb.org/3/movie/${movieId}/videos?language=en-US`, API_OPTIONS);
-    const json = await data.json();
-    const results = json.results
-    if (results && results.length > 0) {
-      const randomIndex = Math.floor(Math.random() * results.length);
-      const trailer = results[randomIndex];
-      dispatch(addMovieTrailer(trailer));
-    }
-
-  };
-
-  useEffect(() => { getMovieTrailer() }, []);
+  useEffect(() => {
+    fetchTmdb(`movie/${movieId}/videos`, { language: "en-US" })
+      .then((json) => {
+        // Prefer an official YouTube trailer, fall back to any video.
+        const videos = json.results || [];
+        const trailer =
+          videos.find((v) => v.site === "YouTube" && v.type === "Trailer") || videos[0];
+        if (trailer) dispatch(addMovieTrailer(trailer));
+      })
+      .catch((err) => console.error(err));
+  }, [movieId, dispatch]);
 
   return (
     <div className="w-screen">

@@ -27,8 +27,9 @@ yarn-error.log*
 .firebase
 .firebaserc
 firebase.json
-**firebase.js
 **keys.js
 
 
 
+.vercel
+.env.backup

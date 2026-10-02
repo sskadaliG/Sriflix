@@ -6,7 +6,7 @@ import { useEffect } from 'react';
 import { onAuthStateChanged } from "firebase/auth";
 import { useDispatch } from 'react-redux';
 import { addUser, removeUser } from "../utils/userSlice"
-import { LOGO, SRIFLIX_LOGO, SUPPORTED_LANGUAGES, user_AVATAR } from "../utils/constants";
+import { LOGO, SUPPORTED_LANGUAGES, user_AVATAR } from "../utils/constants";
 import { toggleGptSearchView } from "../utils/gptSlice";
 import { selectLanguage } from "../utils/configSlice";
 import lang from "../utils/languageConstants";
@@ -47,7 +47,7 @@ const Header = () => {
       }
     });
     return () => unsubscribe();
-  }, []);
+  }, [dispatch, navigate]);
 
   const handleGptSearchClick = () => {
     dispatch(toggleGptSearchView());

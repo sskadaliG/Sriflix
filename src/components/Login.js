@@ -5,7 +5,7 @@ import { createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfi
 import { auth } from '../utils/firebase';
 import { addUser } from '../utils/userSlice';
 import { useDispatch } from 'react-redux';
-import { BACKGROUND_LOGO, SRIFLIX_BG_LOGO, user_AVATAR } from '../utils/constants';
+import { BACKGROUND_LOGO, user_AVATAR } from '../utils/constants';
 
 const Login = () => {
     const [isSignInForm, setIsSignInForm] = useState(true);
@@ -48,16 +48,10 @@ const Login = () => {
                     setErrorMessage(errorCode + " - " + errorMessage);
                 });
         } else {
+            // On success, the onAuthStateChanged listener in Header redirects to /browse.
             signInWithEmailAndPassword(auth, email.current.value, password.current.value)
-                .then((userCredential) => {
-                    // Signed in 
-                    const user = userCredential.user;
-                    // ...
-                })
                 .catch((error) => {
-                    const errorCode = error.code;
-                    const errorMessage = error.message;
-                    setErrorMessage(errorMessage);
+                    setErrorMessage(error.message);
                 });
 
 
