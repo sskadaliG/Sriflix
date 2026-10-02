@@ -1,70 +1,93 @@
-# Getting Started with Create React App
+# Sriflix
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+A movie streaming web app with **AI-powered movie recommendations**. Describe what you're in the mood for ("feel-good sci-fi", "funny Telugu action movies") and Sriflix suggests five films, pulls their posters from TMDB, and shows them in browsable rows.
 
-## Available Scripts
+**Live demo:** https://sriflix-puce.vercel.app
 
-In the project directory, you can run:
+**Demo login:** `demo@sriflix.app` / `SriflixDemo1` (or sign up with any email)
 
-### `npm start`
+![Browse page](docs/screenshots/browse.png)
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+## Features
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+- **AI movie search:** natural-language recommendations from Google Gemini, matched to real TMDB titles by name and release year
+- **Multi-language search UI:** English, Hindi, Spanish, Chinese, and Korean
+- **Firebase Authentication:** email/password sign up and sign in, with auth-aware routing
+- **Trailer hero banner:** autoplaying YouTube trailer for a now-playing movie
+- **Movie rows:** now playing, top rated, and trending lists from TMDB with horizontal scrolling
+- **No API keys in the browser:** all third-party calls go through serverless functions
 
-### `npm test`
+| AI search | Sign in |
+| --- | --- |
+| ![AI search](docs/screenshots/ai-search.png) | ![Sign in](docs/screenshots/login.png) |
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+## Tech stack
 
-### `npm run build`
+| Layer | Tools |
+| --- | --- |
+| Frontend | React 19, Redux Toolkit, React Router, Tailwind CSS |
+| Auth | Firebase Authentication |
+| Serverless API | Vercel Functions (Node.js) |
+| AI | Google Gemini API (structured JSON output) |
+| Data | TMDB API |
+| Hosting | Vercel |
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+## Architecture
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+```
+Browser (React + Redux)
+   │
+   ├── Firebase Auth ─────────────── sign up / sign in
+   │
+   ├── GET  /api/tmdb?path=...  ──►  Vercel Function ──► TMDB API
+   │        (allowlisted paths, CDN-cached for 1 hour)
+   │
+   └── POST /api/gpt-search     ──►  Vercel Function ──► Gemini API (5 suggestions as JSON)
+                                                     └─► TMDB search (in parallel)
+```
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+**Why serverless functions?** The first version called OpenAI and TMDB directly from the browser, which meant the API keys were bundled into public JavaScript where anyone could copy them. Moving those calls into Vercel Functions keeps every secret on the server. The TMDB proxy only allows the endpoints the app needs, and responses are cached at the CDN so repeat visits don't hit TMDB at all.
 
-### `npm run eject`
+**How AI search works:**
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+1. The browser sends the user's request to `/api/gpt-search`.
+2. The function asks Gemini for 5 movies, using a JSON response schema (`title` + `year`) so the output is always parseable.
+3. All 5 titles are searched on TMDB in parallel (`Promise.all`), filtered by release year, and ranked with exact title matches first.
+4. The function returns the results in one response, and Redux stores them for the suggestion rows.
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+**State management:** Redux Toolkit slices hold the user, movie lists, AI search results, and language setting. Movie-list hooks skip the network call when the data is already in the store, so switching between pages doesn't refetch.
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+## Run locally
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+```bash
+git clone https://github.com/sskadaliG/Sriflix.git
+cd Sriflix
+npm install
+cp .env.example .env   # then fill in your keys
+npm i -g vercel
+vercel dev             # runs the React app and the /api functions together
+```
 
-## Learn More
+You'll need:
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+- a free **TMDB** API read access token: https://www.themoviedb.org/settings/api
+- a free **Gemini** API key: https://aistudio.google.com/apikey
+- a **Firebase** project with Email/Password sign-in enabled
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+`npm start` also works for the UI alone, but the `/api` routes only run under `vercel dev` or on Vercel.
 
-### Code Splitting
+## Project structure
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+```
+api/
+  gpt-search.js     Gemini + TMDB recommendation endpoint
+  tmdb.js           allowlisted, cached TMDB proxy
+src/
+  components/       Header, Login, Browse, AI search, movie rows, trailer hero
+  hooks/            data-fetching hooks for each movie list
+  utils/            Redux slices, Firebase setup, TMDB client, constants
+```
 
-### Analyzing the Bundle Size
+## Disclaimer
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+Sriflix is a portfolio project and is not affiliated with Netflix. Movie data and images are provided by [TMDB](https://www.themoviedb.org/). This product uses the TMDB API but is not endorsed or certified by TMDB.
