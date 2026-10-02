@@ -5,11 +5,14 @@ import MovieList from './MovieList';
 const GptMovieSuggestions = () => {
     const { movieResults, movieNames } = useSelector((store) => store.gpt);
     if (!movieNames) return null;
+
+    // Best TMDB match for each AI suggestion, shown together in one row.
+    const topPicks = movieResults.map((results) => results[0]).filter(Boolean);
+
     return (
-        <div className="bg-black p-4 text-white bg-opacity-80">
-            <div className="relative z-2 -mt-80">
-                {movieNames.map((movie, index) => <MovieList key={index} title={movie} movies={movieResults[index]}/>)}
-            </div>
+        <div className="bg-black px-8 pb-8 text-white bg-opacity-60">
+            <MovieList title="✨ AI picks for you" movies={topPicks} />
+            <p className="text-gray-400 text-sm pt-2">{movieNames.join(" · ")}</p>
         </div>
     )
 }

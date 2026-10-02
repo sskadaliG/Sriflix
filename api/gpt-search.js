@@ -35,13 +35,16 @@ const searchTmdb = async ({ title, year }) => {
   });
   const data = await response.json();
 
-  // Exact title matches first, then by popularity, so "King" doesn't become
-  // "The Return of the King".
+  // If any result matches the title exactly, show only those, so "King"
+  // doesn't become "The Return of the King". Otherwise fall back to the
+  // most popular matches.
   const target = normalize(title);
   const isExact = (movie) => normalize(movie.title) === target || normalize(movie.original_title) === target;
-  return (data.results || [])
+  const matches = (data.results || [])
     .filter((movie) => movie.poster_path)
-    .sort((a, b) => isExact(b) - isExact(a) || b.popularity - a.popularity);
+    .sort((a, b) => b.popularity - a.popularity);
+  const exact = matches.filter(isExact);
+  return exact.length > 0 ? exact : matches;
 };
 
 module.exports = async (req, res) => {
