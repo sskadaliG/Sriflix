@@ -2,8 +2,8 @@ import React from 'react'
 import { useSelector } from 'react-redux'
 import MovieList from './MovieList';
 
-const GptMovieSuggestions = () => {
-    const { movieResults, movieNames } = useSelector((store) => store.gpt);
+const AiMovieSuggestions = () => {
+    const { movieResults, movieNames } = useSelector((store) => store.ai);
     if (!movieNames) return null;
 
     // Best TMDB match for each AI suggestion, shown together in one row.
@@ -17,4 +17,4 @@ const GptMovieSuggestions = () => {
     )
 }
 
-export default GptMovieSuggestions
+export default AiMovieSuggestions

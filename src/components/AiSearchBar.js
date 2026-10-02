@@ -1,10 +1,10 @@
 import React, { useRef, useState } from 'react'
 import lang from '../utils/languageConstants';
 import { useDispatch, useSelector } from 'react-redux';
-import { addGptMovieResult } from '../utils/gptSlice';
+import { addAiMovieResult } from '../utils/aiSlice';
 
 
-const GptSearchBar = () => {
+const AiSearchBar = () => {
 
   const language = useSelector((store) => store.config.lang);
 
@@ -22,8 +22,8 @@ const GptSearchBar = () => {
     setLoading(true);
     setError(null);
     try {
-      // The serverless function calls OpenAI and TMDB so no keys reach the browser.
-      const response = await fetch("/api/gpt-search", {
+      // The serverless function calls Gemini and TMDB so no keys reach the browser.
+      const response = await fetch("/api/ai-search", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query }),
@@ -31,7 +31,7 @@ const GptSearchBar = () => {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Search failed");
 
-      dispatch(addGptMovieResult({ movieNames: data.movieNames, movieResults: data.movieResults }));
+      dispatch(addAiMovieResult({ movieNames: data.movieNames, movieResults: data.movieResults }));
     } catch (err) {
       setError(err.message);
     } finally {
@@ -43,7 +43,7 @@ const GptSearchBar = () => {
     <div className="flex justify-center pt-36 pb-8">
       <div className="bg-black w-1/2 bg-opacity-80 rounded">
         <form onSubmit={(e) => { e.preventDefault(); handleSearch(); }} className="grid grid-cols-12 w-full ">
-          <input ref={selectText} maxLength={200} className=" text-black p-4 m-4 col-span-9 rounded bg-opacity-80" type="text" placeholder={lang[language].gptSearchPlaceHolder}></input>
+          <input ref={selectText} maxLength={200} className=" text-black p-4 m-4 col-span-9 rounded bg-opacity-80" type="text" placeholder={lang[language].aiSearchPlaceHolder}></input>
           <button type="submit" disabled={loading} className="bg-red-700 text-white my-4 mr-4 col-span-3 rounded bg-opacity-80 hover:opacity-80 disabled:opacity-50">
             {loading ? "..." : lang[language].search}
           </button>
@@ -55,4 +55,4 @@ const GptSearchBar = () => {
   )
 }
 
-export default GptSearchBar;
+export default AiSearchBar;

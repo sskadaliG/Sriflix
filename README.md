@@ -43,7 +43,7 @@ Browser (React + Redux)
    ├── GET  /api/tmdb?path=...  ──►  Vercel Function ──► TMDB API
    │        (allowlisted paths, CDN-cached for 1 hour)
    │
-   └── POST /api/gpt-search     ──►  Vercel Function ──► Gemini API (5 suggestions as JSON)
+   └── POST /api/ai-search      ──►  Vercel Function ──► Gemini API (5 suggestions as JSON)
                                                      └─► TMDB search (in parallel)
 ```
 
@@ -51,7 +51,7 @@ Browser (React + Redux)
 
 **How AI search works:**
 
-1. The browser sends the user's request to `/api/gpt-search`.
+1. The browser sends the user's request to `/api/ai-search`.
 2. The function asks Gemini for 5 movies, using a JSON response schema (`title` + `year`) so the output is always parseable.
 3. All 5 titles are searched on TMDB in parallel (`Promise.all`), filtered by release year, and ranked with exact title matches first.
 4. The function returns the results in one response, and Redux stores them for the suggestion rows.
@@ -81,7 +81,7 @@ You'll need:
 
 ```
 api/
-  gpt-search.js     Gemini + TMDB recommendation endpoint
+  ai-search.js      Gemini + TMDB recommendation endpoint
   tmdb.js           allowlisted, cached TMDB proxy
 src/
   components/       Header, Login, Browse, AI search, movie rows, trailer hero
