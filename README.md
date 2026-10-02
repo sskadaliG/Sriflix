@@ -14,6 +14,7 @@ A movie streaming web app with **AI-powered movie recommendations**. Describe wh
 - **Multi-language search UI:** English, Hindi, Spanish, Chinese, and Korean
 - **Firebase Authentication:** email/password sign up and sign in, with auth-aware routing
 - **Trailer hero banner:** autoplaying YouTube trailer for a now-playing movie
+- **Trailer pop-up:** click any movie (or Play / More Info) to watch its YouTube trailer with the year, rating, and overview; closes with ✕, Esc, or a click outside
 - **Movie rows:** now playing, top rated, and trending lists from TMDB with horizontal scrolling
 - **No API keys in the browser:** all third-party calls go through serverless functions
 
@@ -55,7 +56,7 @@ Browser (React + Redux)
 3. All 5 titles are searched on TMDB in parallel (`Promise.all`), filtered by release year, and ranked with exact title matches first.
 4. The function returns the results in one response, and Redux stores them for the suggestion rows.
 
-**State management:** Redux Toolkit slices hold the user, movie lists, AI search results, and language setting. Movie-list hooks skip the network call when the data is already in the store, so switching between pages doesn't refetch.
+**State management:** Redux Toolkit slices hold the user, movie lists, the movie open in the trailer pop-up, AI search results, and language setting. Movie-list hooks skip the network call when the data is already in the store, so switching between pages doesn't refetch.
 
 ## Run locally
 
