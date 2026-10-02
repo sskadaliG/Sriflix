@@ -5,12 +5,28 @@
 const MAX_QUERY_LENGTH = 200;
 
 const buildPrompt = (query) =>
-  "Act as a movie recommendation system and suggest some movies for the query: " +
-  query +
-  ". Only give me names of 5 movies, comma separated, like this example: Pokiri, Don, King, Khaleja, Dhruva";
+  "Act as a movie recommendation system. Suggest 5 real movies for this request: " + query;
 
-const searchTmdb = async (title) => {
+// Ask Gemini for JSON matching this schema instead of free text, so titles
+// containing commas or extra chatter can't break parsing.
+const RESPONSE_SCHEMA = {
+  type: "ARRAY",
+  items: {
+    type: "OBJECT",
+    properties: {
+      title: { type: "STRING" },
+      year: { type: "INTEGER" },
+    },
+    required: ["title", "year"],
+  },
+};
+
+// Lowercase and strip punctuation so "WALL·E" matches "Wall-E".
+const normalize = (text) => (text || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+
+const searchTmdb = async ({ title, year }) => {
   const params = new URLSearchParams({ query: title, include_adult: "false", language: "en-US" });
+  if (year) params.set("year", year);
   const response = await fetch(`https://api.themoviedb.org/3/search/movie?${params}`, {
     headers: {
       Authorization: `Bearer ${process.env.TMDB_READ_TOKEN}`,
@@ -18,7 +34,14 @@ const searchTmdb = async (title) => {
     },
   });
   const data = await response.json();
-  return data.results || [];
+
+  // Exact title matches first, then by popularity, so "King" doesn't become
+  // "The Return of the King".
+  const target = normalize(title);
+  const isExact = (movie) => normalize(movie.title) === target || normalize(movie.original_title) === target;
+  return (data.results || [])
+    .filter((movie) => movie.poster_path)
+    .sort((a, b) => isExact(b) - isExact(a) || b.popularity - a.popularity);
 };
 
 module.exports = async (req, res) => {
@@ -41,7 +64,13 @@ module.exports = async (req, res) => {
           "x-goog-api-key": process.env.GEMINI_API_KEY,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ contents: [{ parts: [{ text: buildPrompt(query) }] }] }),
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: buildPrompt(query) }] }],
+          generationConfig: {
+            responseMimeType: "application/json",
+            responseSchema: RESPONSE_SCHEMA,
+          },
+        }),
       }
     );
 
@@ -50,19 +79,18 @@ module.exports = async (req, res) => {
     }
 
     const aiData = await aiResponse.json();
-    const content = aiData.candidates?.[0]?.content?.parts?.[0]?.text || "";
-    const movieNames = content
-      .split(",")
-      .map((name) => name.trim())
-      .filter(Boolean)
+    const text = aiData.candidates?.[0]?.content?.parts?.[0]?.text || "[]";
+    const suggestions = JSON.parse(text)
+      .filter((movie) => movie?.title)
       .slice(0, 5);
 
-    if (movieNames.length === 0) {
+    if (suggestions.length === 0) {
       return res.status(502).json({ error: "No suggestions returned, try rephrasing" });
     }
 
     // Look up all suggested titles in parallel.
-    const movieResults = await Promise.all(movieNames.map(searchTmdb));
+    const movieResults = await Promise.all(suggestions.map(searchTmdb));
+    const movieNames = suggestions.map((movie) => `${movie.title} (${movie.year})`);
 
     return res.status(200).json({ movieNames, movieResults });
   } catch (err) {
