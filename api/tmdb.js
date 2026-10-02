@@ -29,8 +29,12 @@ module.exports = async (req, res) => {
     });
     const data = await response.json();
 
-    // Let Vercel's CDN cache movie lists for an hour to cut down on TMDB calls.
-    res.setHeader("Cache-Control", "s-maxage=3600, stale-while-revalidate=86400");
+    // Let Vercel's CDN cache successful responses for an hour to cut down on
+    // TMDB calls. Never cache errors, or a bad token would stick for an hour.
+    res.setHeader(
+      "Cache-Control",
+      response.ok ? "s-maxage=3600, stale-while-revalidate=86400" : "no-store"
+    );
     return res.status(response.status).json(data);
   } catch (err) {
     return res.status(502).json({ error: "Failed to reach TMDB" });
