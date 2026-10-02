@@ -1,4 +1,5 @@
 export const IMG_CDN_URL = "https://image.tmdb.org/t/p/w500";
+export const BACKDROP_URL = "https://image.tmdb.org/t/p/original";
 
 export const SUPPORTED_LANGUAGES = [{ identifier: "en", name: "English" },
 { identifier: "hi", name: "Hindi" },

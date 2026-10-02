@@ -2,8 +2,9 @@ import { useEffect } from 'react'
 import { useDispatch, useSelector } from 'react-redux';
 import { addMovieTrailer } from '../utils/movieSlice';
 import { fetchTmdb } from '../utils/tmdb';
+import { BACKDROP_URL } from '../utils/constants';
 
-const VideoBackground = ({ movieId }) => {
+const VideoBackground = ({ movieId, backdropPath }) => {
 
   const trailerVideo = useSelector(store => store.movies?.movieTrailer);
 
@@ -21,9 +22,11 @@ const VideoBackground = ({ movieId }) => {
       .catch((err) => console.error(err));
   }, [movieId, dispatch]);
 
+  // Always reserve the hero's height so the rows below don't slide up over
+  // the title. Show the backdrop image when the movie has no trailer.
   return (
-    <div className="w-screen">
-      {trailerVideo?.key &&
+    <div className="w-screen aspect-video bg-black">
+      {trailerVideo?.key ?
         <iframe className="w-screen aspect-video"
           src={`https://www.youtube.com/embed/${trailerVideo.key}?&autoplay=1&mute=1&controls=0&loop=1&playlist=${trailerVideo.key}`}
           title="YouTube video player"
@@ -31,6 +34,8 @@ const VideoBackground = ({ movieId }) => {
         // referrerPolicy="strict-origin-when-cross-origin" 
         >
         </iframe>
+        : backdropPath &&
+        <img className="w-screen aspect-video object-cover" src={BACKDROP_URL + backdropPath} alt="" />
       }
 
     </div>
