@@ -8,27 +8,42 @@ const { Redis } = require("@upstash/redis");
 
 const MAX_QUERY_LENGTH = 200;
 
-// Per-user limits. Serverless instances don't share memory, so the counters
-// live in Upstash Redis. Reads UPSTASH_REDIS_REST_URL/TOKEN (or the KV_REST_API_*
+// Per-user and per-IP limits. Serverless instances don't share memory, so the
+// counters live in Upstash Redis. Reads UPSTASH_REDIS_REST_URL/TOKEN (or the KV_REST_API_*
 // names Vercel's Upstash integration sets).
 const hasRedis = Boolean(
   (process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL) &&
   (process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN)
 );
 const redis = hasRedis ? Redis.fromEnv() : null;
+// The per-IP limit stops one person from getting around the per-user limits by
+// creating lots of accounts. It's higher than the per-user one so a few people
+// sharing a network (home, office, campus) don't block each other.
 const RATE_LIMITS = redis
   ? [
-    { label: "minute", limiter: new Ratelimit({ redis, prefix: "ai-search:minute", limiter: Ratelimit.slidingWindow(10, "1 m") }) },
-    { label: "day", limiter: new Ratelimit({ redis, prefix: "ai-search:day", limiter: Ratelimit.fixedWindow(50, "1 d") }) },
+    { label: "minute", key: "uid", limiter: new Ratelimit({ redis, prefix: "ai-search:minute", limiter: Ratelimit.slidingWindow(10, "1 m") }) },
+    { label: "day", key: "uid", limiter: new Ratelimit({ redis, prefix: "ai-search:day", limiter: Ratelimit.fixedWindow(50, "1 d") }) },
+    { label: "ip-day", key: "ip", limiter: new Ratelimit({ redis, prefix: "ai-search:ip-day", limiter: Ratelimit.fixedWindow(100, "1 d") }) },
   ]
   : [];
 
+const RATE_LIMIT_MESSAGES = {
+  minute: "Too many searches, please wait a minute and try again",
+  day: "You've reached today's AI search limit, please come back tomorrow",
+  "ip-day": "Too many searches from your network today, please come back tomorrow",
+};
+
+// Vercel sets x-real-ip to the client's address and overwrites any value the
+// client sends, so it can't be spoofed to dodge the per-IP limit.
+const getClientIp = (req) =>
+  req.headers["x-real-ip"] || (req.headers["x-forwarded-for"] || "").split(",")[0].trim() || "unknown";
+
 // Checks the limits in order and stops at the first one that's used up, so a
-// request blocked by the minute limit doesn't also count against the daily one.
+// request blocked by the minute limit doesn't also count against the daily ones.
 // Returns null when allowed, or the blocking limit's label and reset time.
-const checkRateLimit = async (uid) => {
-  for (const { label, limiter } of RATE_LIMITS) {
-    const { success, reset } = await limiter.limit(uid);
+const checkRateLimit = async (ids) => {
+  for (const { label, key, limiter } of RATE_LIMITS) {
+    const { success, reset } = await limiter.limit(ids[key]);
     if (!success) return { label, reset };
   }
   return null;
@@ -41,7 +56,7 @@ const FIREBASE_JWKS = createRemoteJWKSet(
   new URL("https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com")
 );
 
-// Returns the signed-in user's uid, or null if the token is missing or invalid.
+// Returns the verified token's claims, or null if the token is missing or invalid.
 const verifyFirebaseToken = async (req) => {
   const projectId = process.env.REACT_APP_FIREBASE_PROJECT_ID;
   const match = /^Bearer (.+)$/.exec(req.headers.authorization || "");
@@ -53,7 +68,7 @@ const verifyFirebaseToken = async (req) => {
       audience: projectId,
       algorithms: ["RS256"],
     });
-    return payload.sub || null;
+    return payload.sub ? payload : null;
   } catch (err) {
     return null;
   }
@@ -108,12 +123,18 @@ module.exports = async (req, res) => {
   }
 
   // Only signed-in users can spend Gemini quota.
-  const uid = await verifyFirebaseToken(req);
-  if (!uid) {
+  const user = await verifyFirebaseToken(req);
+  if (!user) {
     return res.status(401).json({ error: "Please sign in to use AI search" });
   }
+  // Signing up is free, so an unverified account could be a throwaway made to
+  // get around the per-user limits. Require a verified email.
+  if (user.email_verified !== true) {
+    return res.status(403).json({ error: "Please verify your email to use AI search", code: "email-not-verified" });
+  }
 
-  const query = (req.body?.query || "").trim();
+  const rawQuery = req.body?.query;
+  const query = typeof rawQuery === "string" ? rawQuery.trim() : "";
   if (!query || query.length > MAX_QUERY_LENGTH) {
     return res.status(400).json({ error: `Query must be 1-${MAX_QUERY_LENGTH} characters` });
   }
@@ -126,18 +147,14 @@ module.exports = async (req, res) => {
 
   let blocked;
   try {
-    blocked = await checkRateLimit(uid);
+    blocked = await checkRateLimit({ uid: user.sub, ip: getClientIp(req) });
   } catch (err) {
     return res.status(503).json({ error: "AI search is unavailable right now" });
   }
   if (blocked) {
     const retryAfter = Math.max(1, Math.ceil((blocked.reset - Date.now()) / 1000));
     res.setHeader("Retry-After", String(retryAfter));
-    const message =
-      blocked.label === "minute"
-        ? "Too many searches, please wait a minute and try again"
-        : "You've reached today's AI search limit, please come back tomorrow";
-    return res.status(429).json({ error: message });
+    return res.status(429).json({ error: RATE_LIMIT_MESSAGES[blocked.label] });
   }
 
   try {

@@ -52,8 +52,8 @@ Browser (React + Redux)
 **How AI search works:**
 
 1. The browser sends the user's request to `/api/ai-search` with the user's Firebase ID token.
-2. The function verifies the token against Google's public keys (signature, issuer, audience, expiry) and rejects anyone not signed in with a 401, so the endpoint can't be used to burn Gemini quota.
-3. Each user is limited to 10 searches a minute and 50 a day. The counters live in Upstash Redis, because serverless instances don't share memory; over the limit returns a 429 with `Retry-After`.
+2. The function verifies the token against Google's public keys (signature, issuer, audience, expiry) and rejects anyone not signed in with a 401, so the endpoint can't be used to burn Gemini quota. The account's email must also be verified (a link is emailed at sign-up), so throwaway accounts can't be used to multiply the limits.
+3. Each user is limited to 10 searches a minute and 50 a day, and each IP address to 100 a day. The counters live in Upstash Redis, because serverless instances don't share memory; over the limit returns a 429 with `Retry-After`.
 4. The function asks Gemini for 5 movies, using a JSON response schema (`title` + `year`) so the output is always parseable.
 5. All 5 titles are searched on TMDB in parallel (`Promise.all`), filtered by release year, and ranked with exact title matches first.
 6. The function returns the results in one response, and Redux stores them for the suggestion rows.

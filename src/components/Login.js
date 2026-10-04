@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import Header from './Header';
 import { checkValidData } from '../utils/validate';
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile } from "firebase/auth";
+import { createUserWithEmailAndPassword, sendEmailVerification, signInWithEmailAndPassword, updateProfile } from "firebase/auth";
 import { auth } from '../utils/firebase';
 import { addUser } from '../utils/userSlice';
 import { useDispatch } from 'react-redux';
@@ -28,6 +28,9 @@ const Login = () => {
                 .then((userCredential) => {
                     // Signed up 
                     const user = userCredential.user;
+                    // AI search needs a verified email, so send the link right away.
+                    // A failed send isn't fatal: the AI search page offers a resend.
+                    sendEmailVerification(user).catch(() => {});
                     updateProfile(user, {
                         displayName: name.current.value
                     }).then(() => {

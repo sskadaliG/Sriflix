@@ -3,6 +3,7 @@ import lang from '../utils/languageConstants';
 import { useDispatch, useSelector } from 'react-redux';
 import { addAiMovieResult } from '../utils/aiSlice';
 import { auth } from '../utils/firebase';
+import { sendEmailVerification } from 'firebase/auth';
 
 
 const AiSearchBar = () => {
@@ -15,6 +16,17 @@ const AiSearchBar = () => {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [needsVerification, setNeedsVerification] = useState(false);
+  const [verificationSent, setVerificationSent] = useState(false);
+
+  const handleResendVerification = async () => {
+    try {
+      await sendEmailVerification(auth.currentUser);
+      setVerificationSent(true);
+    } catch (err) {
+      setError(err.message);
+    }
+  };
 
   const handleSearch = async () => {
     const query = selectText.current.value.trim();
@@ -22,18 +34,31 @@ const AiSearchBar = () => {
 
     setLoading(true);
     setError(null);
+    setNeedsVerification(false);
     try {
       // The serverless function calls Gemini and TMDB so no keys reach the browser.
       // It only answers signed-in users, so send the Firebase ID token along.
       // getIdToken() refreshes the token automatically when it has expired.
-      if (!auth.currentUser) throw new Error("Please sign in to use AI search");
-      const idToken = await auth.currentUser.getIdToken();
+      const user = auth.currentUser;
+      if (!user) throw new Error("Please sign in to use AI search");
+
+      // The function also requires a verified email. The saved token still says
+      // "unverified" after the user clicks the email link, so reload the user
+      // and force a fresh token in that case.
+      if (!user.emailVerified) await user.reload();
+      if (!user.emailVerified) {
+        setNeedsVerification(true);
+        throw new Error("Please verify your email to use AI search. Check your inbox for the link.");
+      }
+      const { token, claims } = await user.getIdTokenResult();
+      const idToken = claims.email_verified ? token : await user.getIdToken(true);
       const response = await fetch("/api/ai-search", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
         body: JSON.stringify({ query }),
       });
       const data = await response.json();
+      if (data.code === "email-not-verified") setNeedsVerification(true);
       if (!response.ok) throw new Error(data.error || "Search failed");
 
       dispatch(addAiMovieResult({ movieNames: data.movieNames, movieResults: data.movieResults }));
@@ -54,6 +79,13 @@ const AiSearchBar = () => {
           </button>
         </form>
         {error && <p className="text-red-500 font-bold px-4 pb-4">{error}</p>}
+        {needsVerification && (
+          <p className="text-white px-4 pb-4">
+            {verificationSent
+              ? "Verification email sent. Click the link in it, then search again."
+              : <button type="button" onClick={handleResendVerification} className="underline hover:opacity-80">Resend verification email</button>}
+          </p>
+        )}
       </div>
     </div>
 
