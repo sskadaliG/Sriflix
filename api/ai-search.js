@@ -2,7 +2,34 @@
 // Runs on the server so the API key stays secret, then looks up each
 // suggested title on TMDB and returns everything in one response.
 
+const { createRemoteJWKSet, jwtVerify } = require("jose");
+
 const MAX_QUERY_LENGTH = 200;
+
+// Firebase ID tokens are JWTs signed by Google. Verifying them against
+// Google's public keys only needs the project ID, no service account.
+// The key set is cached across warm invocations.
+const FIREBASE_JWKS = createRemoteJWKSet(
+  new URL("https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com")
+);
+
+// Returns the signed-in user's uid, or null if the token is missing or invalid.
+const verifyFirebaseToken = async (req) => {
+  const projectId = process.env.REACT_APP_FIREBASE_PROJECT_ID;
+  const match = /^Bearer (.+)$/.exec(req.headers.authorization || "");
+  if (!projectId || !match) return null;
+
+  try {
+    const { payload } = await jwtVerify(match[1], FIREBASE_JWKS, {
+      issuer: `https://securetoken.google.com/${projectId}`,
+      audience: projectId,
+      algorithms: ["RS256"],
+    });
+    return payload.sub || null;
+  } catch (err) {
+    return null;
+  }
+};
 
 const buildPrompt = (query) =>
   "Act as a movie recommendation system. Suggest 5 real movies for this request: " + query;
@@ -50,6 +77,12 @@ const searchTmdb = async ({ title, year }) => {
 module.exports = async (req, res) => {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
+  }
+
+  // Only signed-in users can spend Gemini quota.
+  const uid = await verifyFirebaseToken(req);
+  if (!uid) {
+    return res.status(401).json({ error: "Please sign in to use AI search" });
   }
 
   const query = (req.body?.query || "").trim();

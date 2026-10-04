@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react'
 import lang from '../utils/languageConstants';
 import { useDispatch, useSelector } from 'react-redux';
 import { addAiMovieResult } from '../utils/aiSlice';
+import { auth } from '../utils/firebase';
 
 
 const AiSearchBar = () => {
@@ -23,9 +24,13 @@ const AiSearchBar = () => {
     setError(null);
     try {
       // The serverless function calls Gemini and TMDB so no keys reach the browser.
+      // It only answers signed-in users, so send the Firebase ID token along.
+      // getIdToken() refreshes the token automatically when it has expired.
+      if (!auth.currentUser) throw new Error("Please sign in to use AI search");
+      const idToken = await auth.currentUser.getIdToken();
       const response = await fetch("/api/ai-search", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
         body: JSON.stringify({ query }),
       });
       const data = await response.json();
