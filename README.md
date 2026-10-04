@@ -53,9 +53,10 @@ Browser (React + Redux)
 
 1. The browser sends the user's request to `/api/ai-search` with the user's Firebase ID token.
 2. The function verifies the token against Google's public keys (signature, issuer, audience, expiry) and rejects anyone not signed in with a 401, so the endpoint can't be used to burn Gemini quota.
-3. The function asks Gemini for 5 movies, using a JSON response schema (`title` + `year`) so the output is always parseable.
-4. All 5 titles are searched on TMDB in parallel (`Promise.all`), filtered by release year, and ranked with exact title matches first.
-5. The function returns the results in one response, and Redux stores them for the suggestion rows.
+3. Each user is limited to 10 searches a minute and 50 a day. The counters live in Upstash Redis, because serverless instances don't share memory; over the limit returns a 429 with `Retry-After`.
+4. The function asks Gemini for 5 movies, using a JSON response schema (`title` + `year`) so the output is always parseable.
+5. All 5 titles are searched on TMDB in parallel (`Promise.all`), filtered by release year, and ranked with exact title matches first.
+6. The function returns the results in one response, and Redux stores them for the suggestion rows.
 
 **State management:** Redux Toolkit slices hold the user, movie lists, the movie open in the trailer pop-up, AI search results, and language setting. Movie-list hooks skip the network call when the data is already in the store, so switching between pages doesn't refetch.
 
@@ -74,6 +75,7 @@ You'll need:
 
 - a free **TMDB** API read access token: https://www.themoviedb.org/settings/api
 - a free **Gemini** API key: https://aistudio.google.com/apikey
+- a free **Upstash Redis** database for rate limiting: https://console.upstash.com (copy the REST URL and token)
 - a **Firebase** project with Email/Password sign-in enabled
 
 `npm start` also works for the UI alone, but the `/api` routes only run under `vercel dev` or on Vercel.

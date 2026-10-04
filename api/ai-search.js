@@ -3,8 +3,36 @@
 // suggested title on TMDB and returns everything in one response.
 
 const { createRemoteJWKSet, jwtVerify } = require("jose");
+const { Ratelimit } = require("@upstash/ratelimit");
+const { Redis } = require("@upstash/redis");
 
 const MAX_QUERY_LENGTH = 200;
+
+// Per-user limits. Serverless instances don't share memory, so the counters
+// live in Upstash Redis. Reads UPSTASH_REDIS_REST_URL/TOKEN (or the KV_REST_API_*
+// names Vercel's Upstash integration sets).
+const hasRedis = Boolean(
+  (process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL) &&
+  (process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN)
+);
+const redis = hasRedis ? Redis.fromEnv() : null;
+const RATE_LIMITS = redis
+  ? [
+    { label: "minute", limiter: new Ratelimit({ redis, prefix: "ai-search:minute", limiter: Ratelimit.slidingWindow(10, "1 m") }) },
+    { label: "day", limiter: new Ratelimit({ redis, prefix: "ai-search:day", limiter: Ratelimit.fixedWindow(50, "1 d") }) },
+  ]
+  : [];
+
+// Checks the limits in order and stops at the first one that's used up, so a
+// request blocked by the minute limit doesn't also count against the daily one.
+// Returns null when allowed, or the blocking limit's label and reset time.
+const checkRateLimit = async (uid) => {
+  for (const { label, limiter } of RATE_LIMITS) {
+    const { success, reset } = await limiter.limit(uid);
+    if (!success) return { label, reset };
+  }
+  return null;
+};
 
 // Firebase ID tokens are JWTs signed by Google. Verifying them against
 // Google's public keys only needs the project ID, no service account.
@@ -88,6 +116,28 @@ module.exports = async (req, res) => {
   const query = (req.body?.query || "").trim();
   if (!query || query.length > MAX_QUERY_LENGTH) {
     return res.status(400).json({ error: `Query must be 1-${MAX_QUERY_LENGTH} characters` });
+  }
+
+  // Without a shared store there is no way to enforce the limits, so refuse
+  // rather than let unlimited searches through.
+  if (!redis) {
+    return res.status(503).json({ error: "AI search is not configured" });
+  }
+
+  let blocked;
+  try {
+    blocked = await checkRateLimit(uid);
+  } catch (err) {
+    return res.status(503).json({ error: "AI search is unavailable right now" });
+  }
+  if (blocked) {
+    const retryAfter = Math.max(1, Math.ceil((blocked.reset - Date.now()) / 1000));
+    res.setHeader("Retry-After", String(retryAfter));
+    const message =
+      blocked.label === "minute"
+        ? "Too many searches, please wait a minute and try again"
+        : "You've reached today's AI search limit, please come back tomorrow";
+    return res.status(429).json({ error: message });
   }
 
   try {
