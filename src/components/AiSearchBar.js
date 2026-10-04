@@ -17,14 +17,16 @@ const AiSearchBar = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [needsVerification, setNeedsVerification] = useState(false);
-  const [verificationSent, setVerificationSent] = useState(false);
+  const [resendStatus, setResendStatus] = useState(null);
 
+  // Sign-up already sent one email, and Firebase throttles repeat sends to the
+  // same user, so a quick resend often fails with auth/too-many-requests.
   const handleResendVerification = async () => {
     try {
       await sendEmailVerification(auth.currentUser);
-      setVerificationSent(true);
+      setResendStatus("sent");
     } catch (err) {
-      setError(err.message);
+      setResendStatus(err.code === "auth/too-many-requests" ? "throttled" : "failed");
     }
   };
 
@@ -48,7 +50,7 @@ const AiSearchBar = () => {
       if (!user.emailVerified) await user.reload();
       if (!user.emailVerified) {
         setNeedsVerification(true);
-        throw new Error("Please verify your email to use AI search. Check your inbox for the link.");
+        throw new Error("Please verify your email to use AI search.");
       }
       const { token, claims } = await user.getIdTokenResult();
       const idToken = claims.email_verified ? token : await user.getIdToken(true);
@@ -81,9 +83,13 @@ const AiSearchBar = () => {
         {error && <p className="text-red-500 font-bold px-4 pb-4">{error}</p>}
         {needsVerification && (
           <p className="text-white px-4 pb-4">
-            {verificationSent
-              ? "Verification email sent. Click the link in it, then search again."
-              : <button type="button" onClick={handleResendVerification} className="underline hover:opacity-80">Resend verification email</button>}
+            We sent a verification link to {auth.currentUser?.email} when you signed up. Check your inbox and spam folder, click the link, then search again.{" "}
+            {resendStatus === "sent" && "A new verification email is on its way. "}
+            {resendStatus === "throttled" && "A verification email was sent recently, so please check for that one or try resending in a few minutes. "}
+            {resendStatus === "failed" && "Couldn't send the email, please try again later. "}
+            {resendStatus !== "sent" && (
+              <button type="button" onClick={handleResendVerification} className="underline hover:opacity-80">Didn't get it? Resend</button>
+            )}
           </p>
         )}
       </div>
