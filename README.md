@@ -4,7 +4,7 @@ A movie streaming web app with **AI-powered movie recommendations**. Describe wh
 
 **Live demo:** https://sriflix-puce.vercel.app
 
-**Demo login:** `demo@sriflix.app` / `SriflixDemo1` (or sign up with any email)
+**Demo login:** `demo@sriflix.app` / `SriflixDemo1` (or sign up with your own email; AI search needs a verified address)
 
 ![Browse page](docs/screenshots/browse.png)
 
@@ -12,11 +12,12 @@ A movie streaming web app with **AI-powered movie recommendations**. Describe wh
 
 - **AI movie search:** natural-language recommendations from Google Gemini, matched to real TMDB titles by name and release year
 - **Multi-language search UI:** English, Hindi, Spanish, Chinese, and Korean
-- **Firebase Authentication:** email/password sign up and sign in, with auth-aware routing
+- **Firebase Authentication:** email/password sign up and sign in with email verification, and auth-aware routing
 - **Trailer hero banner:** autoplaying YouTube trailer for a now-playing movie
 - **Trailer pop-up:** click any movie (or Play / More Info) to watch its YouTube trailer with the year, rating, and overview; closes with ✕, Esc, or a click outside
 - **Movie rows:** now playing, top rated, and trending lists from TMDB with horizontal scrolling
 - **No API keys in the browser:** all third-party calls go through serverless functions
+- **Abuse protection:** AI search requires a verified account and is rate limited per user and per IP
 
 | AI search | Sign in |
 | --- | --- |
@@ -28,7 +29,8 @@ A movie streaming web app with **AI-powered movie recommendations**. Describe wh
 | --- | --- |
 | Frontend | React 19, Redux Toolkit, React Router, Tailwind CSS |
 | Auth | Firebase Authentication |
-| Serverless API | Vercel Functions (Node.js) |
+| Serverless API | Vercel Functions (Node.js), `jose` for Firebase token verification |
+| Rate limiting | Upstash Redis (`@upstash/ratelimit`) |
 | AI | Google Gemini API (structured JSON output) |
 | Data | TMDB API |
 | Hosting | Vercel |
@@ -43,7 +45,9 @@ Browser (React + Redux)
    ├── GET  /api/tmdb?path=...  ──►  Vercel Function ──► TMDB API
    │        (allowlisted paths, CDN-cached for 1 hour)
    │
-   └── POST /api/ai-search      ──►  Vercel Function ──► Gemini API (5 suggestions as JSON)
+   └── POST /api/ai-search      ──►  Vercel Function ──► verify Firebase ID token (verified email)
+        (Bearer ID token)                            ├─► Upstash Redis (per-user + per-IP limits)
+                                                     ├─► Gemini API (5 suggestions as JSON)
                                                      └─► TMDB search (in parallel)
 ```
 
@@ -57,6 +61,8 @@ Browser (React + Redux)
 4. The function asks Gemini for 5 movies, using a JSON response schema (`title` + `year`) so the output is always parseable.
 5. All 5 titles are searched on TMDB in parallel (`Promise.all`), filtered by release year, and ranked with exact title matches first.
 6. The function returns the results in one response, and Redux stores them for the suggestion rows.
+
+**Security headers:** `vercel.json` sets a strict Content Security Policy (scripts only from the app itself and Google's sign-in helper, network calls only to the app's API and Firebase Auth), blocks the site from being framed by other sites, and adds `nosniff`, `Referrer-Policy`, and `Permissions-Policy` headers.
 
 **State management:** Redux Toolkit slices hold the user, movie lists, the movie open in the trailer pop-up, AI search results, and language setting. Movie-list hooks skip the network call when the data is already in the store, so switching between pages doesn't refetch.
 
@@ -78,18 +84,21 @@ You'll need:
 - a free **Upstash Redis** database for rate limiting: https://console.upstash.com (copy the REST URL and token)
 - a **Firebase** project with Email/Password sign-in enabled
 
+If you use your own Firebase project, replace `sriflixgpt-63115.firebaseapp.com` in the Content Security Policy in `vercel.json` with your project's auth domain.
+
 `npm start` also works for the UI alone, but the `/api` routes only run under `vercel dev` or on Vercel.
 
 ## Project structure
 
 ```
 api/
-  ai-search.js      Gemini + TMDB recommendation endpoint
+  ai-search.js      Gemini + TMDB recommendation endpoint (sign-in required, rate limited)
   tmdb.js           allowlisted, cached TMDB proxy
 src/
   components/       Header, Login, Browse, AI search, movie rows, trailer hero
   hooks/            data-fetching hooks for each movie list
   utils/            Redux slices, Firebase setup, TMDB client, constants
+vercel.json         SPA rewrites and security headers
 ```
 
 ## Disclaimer
